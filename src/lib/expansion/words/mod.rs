@@ -787,9 +787,9 @@ impl<'a> Iterator for WordIterator<'a> {
 
                     if self.quotes == Quotes::Double {
                         let _ = iterator.next();
-                        self.read += 1;
                         return Some(WordToken::Normal(
                             if next.map_or(true, |c| [b'$', b'@', b'\\', b'"'].contains(&c)) {
+                                self.read += 1;
                                 unescape(&self.data[start..self.read])
                             } else {
                                 self.data[start..self.read].into()
