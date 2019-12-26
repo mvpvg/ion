@@ -13,7 +13,6 @@ enum Quotes {
     Double,
 }
 
-
 /// Unescapes filenames to be passed into the completer
 pub fn unescape(input: &str) -> Cow<'_, str> {
     let mut input: Cow<'_, str> = input.into();
@@ -26,7 +25,6 @@ pub fn unescape(input: &str) -> Cow<'_, str> {
     }
     input
 }
-
 
 pub fn unescape_characters<'a>(input: &'a str, characters: &[char]) -> Cow<'a, str> {
     let mut last_idx: usize = 0;
@@ -149,7 +147,7 @@ pub struct WordIterator<'a> {
 
 impl<'a> WordIterator<'a> {
     fn arithmetic_expression<I: Iterator<Item = u8>>(&mut self, iter: &mut I) -> WordToken<'a> {
-        let _ = iter.next(); // Maybe
+        let _ = iter.next();
 
 
         let mut paren: i8 = 0;
@@ -191,7 +189,6 @@ impl<'a> WordIterator<'a> {
                 b'[' => {
                     square_bracket += 1;
                 }
-                // b' ' | b'"' | b'\'' | b'$' | b'{' | b'}' | b',' => break,
                 b' ' | b'"' | b'\'' | b'$' | b'{' | b'}' => break,
                 b']' => {
                     // If the glob is less than three bytes in width, then it's empty and thus
@@ -265,7 +262,6 @@ impl<'a> WordIterator<'a> {
     where
         I: Iterator<Item = u8>,
     {
-        // let _ = iterator.next(); // Maybe
         let mut start = self.read;
         let mut level = 0;
         let mut elements = Vec::new();
@@ -306,7 +302,7 @@ impl<'a> WordIterator<'a> {
     where
         I: Iterator<Item = u8>,
     {
-        let _ = iterator.next(); // Maybe?
+        let _ = iterator.next();
         let start = self.read;
         let mut level = 0;
         while let Some(character) = iterator.next() {
@@ -413,7 +409,6 @@ impl<'a> WordIterator<'a> {
     {
         let _ = iterator.next();
         let start = self.read;
-        // self.read += 1;
         while let Some(character) = iterator.next() {
             match character {
                 b'[' => {
@@ -458,7 +453,6 @@ impl<'a> WordIterator<'a> {
     {
         let mut method_flags = Quotes::None;
         let mut start = self.read;
-        // self.read += 1;
         while let Some(character) = iterator.next() {
             match character {
                 b'(' => {
@@ -594,11 +588,8 @@ impl<'a> WordIterator<'a> {
         I: Iterator<Item = u8>,
     {
         let mut method_flags = Quotes::None;
-        // let mut method_flags = self.quotes;
         let mut start = self.read;
-        // self.read += 1;
         while let Some(character) = iterator.next() {
-            // println!("CHAR IS {:?}", character);
             match character {
                 b'(' => {
                     let method = &self.data[start..self.read];
