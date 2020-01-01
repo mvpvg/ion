@@ -13,6 +13,7 @@ enum Quotes {
     Double,
 }
 
+
 /// Unescapes filenames to be passed into the completer
 pub fn unescape(input: &str) -> Cow<'_, str> {
     let mut input: Cow<'_, str> = input.into();
@@ -26,24 +27,20 @@ pub fn unescape(input: &str) -> Cow<'_, str> {
     input
 }
 
+
 pub fn unescape_characters<'a>(input: &'a str, characters: &[char]) -> Cow<'a, str> {
     let mut last_idx: usize = 0;
     let mut backslash = false;
     let mut input: Cow<'_, str> = input.into();
     
 
-    loop {
-        match input[last_idx..].find('\\') {
-            Some(idx) => {
-                if let Some(next_character) = input.chars().nth(last_idx + idx + 1) {
-                    if characters.contains(&next_character) {
-                        input.to_mut().remove(last_idx + idx);
-                    }
-                } 
-                last_idx += idx + 1;
-            },
-            None => break,
-        }
+    while let Some(idx) = input[last_idx..].find('\\') {
+        if let Some(next_character) = input.chars().nth(last_idx + idx + 1) {
+            if characters.contains(&next_character) {
+                input.to_mut().remove(last_idx + idx);
+            }
+        } 
+        last_idx += idx + 1;
     }
 
 
@@ -56,6 +53,7 @@ fn index_until_unescaped_character(input: &str, characters: &[u8]) -> (usize, u8
     let mut last_character = b'\0';
     let mut glob_character_found = false;
     let mut backslash = false;
+    
 
     for byte in input.bytes() {
         
@@ -67,7 +65,7 @@ fn index_until_unescaped_character(input: &str, characters: &[u8]) -> (usize, u8
             if byte == b'\\' {
                 backslash = true;
             } else {
-                if !glob_character_found && [b'?', b'[', b'*'].contains(&byte) {
+                if !glob_character_found && [b'?', b'*'].contains(&byte) {
                     glob_character_found = true;
                 }
 
@@ -147,7 +145,7 @@ pub struct WordIterator<'a> {
 
 impl<'a> WordIterator<'a> {
     fn arithmetic_expression<I: Iterator<Item = u8>>(&mut self, iter: &mut I) -> WordToken<'a> {
-        let _ = iter.next();
+        let _ = iter.next(); // Maybe
 
 
         let mut paren: i8 = 0;
@@ -173,7 +171,7 @@ impl<'a> WordIterator<'a> {
         panic!("ion: fatal syntax error: unterminated arithmetic expression");
     }
 
-    fn glob_check<I>(&mut self, iterator: &mut I) -> bool
+    fn glob_check<I>(&mut self, iterator: &mut I, is_text_adjacent: bool) -> bool
     where
         I: Iterator<Item = u8> + Clone,
     {
@@ -183,19 +181,21 @@ impl<'a> WordIterator<'a> {
         let mut glob = false;
         let mut square_bracket = 0;
         let mut iter = iterator.clone().peekable();
+        
         while let Some(character) = iter.next() {
             moves += 1;
             match character {
                 b'[' => {
                     square_bracket += 1;
                 }
+                // b' ' | b'"' | b'\'' | b'$' | b'{' | b'}' | b',' => break,
                 b' ' | b'"' | b'\'' | b'$' | b'{' | b'}' => break,
                 b']' => {
                     // If the glob is less than three bytes in width, then it's empty and thus
                     // invalid. If it's not adjacent to text, it's not a glob.
                     let next_char = iter.peek();
-                    if !(moves <= 3 && square_bracket == 1)
-                        && (next_char != None && next_char != Some(&b' '))
+                    if (moves >= 3 && square_bracket == 0)
+                    && (is_text_adjacent || next_char != None && next_char != Some(&b' '))
                     {
                         glob = true;
                         break;
@@ -262,6 +262,7 @@ impl<'a> WordIterator<'a> {
     where
         I: Iterator<Item = u8>,
     {
+        // let _ = iterator.next(); // Maybe
         let mut start = self.read;
         let mut level = 0;
         let mut elements = Vec::new();
@@ -302,7 +303,7 @@ impl<'a> WordIterator<'a> {
     where
         I: Iterator<Item = u8>,
     {
-        let _ = iterator.next();
+        let _ = iterator.next(); // Maybe?
         let start = self.read;
         let mut level = 0;
         while let Some(character) = iterator.next() {
@@ -409,6 +410,7 @@ impl<'a> WordIterator<'a> {
     {
         let _ = iterator.next();
         let start = self.read;
+        // self.read += 1;
         while let Some(character) = iterator.next() {
             match character {
                 b'[' => {
@@ -453,6 +455,7 @@ impl<'a> WordIterator<'a> {
     {
         let mut method_flags = Quotes::None;
         let mut start = self.read;
+        // self.read += 1;
         while let Some(character) = iterator.next() {
             match character {
                 b'(' => {
@@ -744,6 +747,7 @@ impl<'a> Iterator for WordIterator<'a> {
         }
 
 
+        
         let mut iterator = self.data.bytes().skip(self.read).peekable();
         let mut start = self.read;
         let mut glob = false;
@@ -889,9 +893,9 @@ impl<'a> Iterator for WordIterator<'a> {
                 b'[' => {
                     match self.quotes {
                         Quotes::None => {
-                            if self.glob_check(&mut iterator) {
+                            if self.glob_check(&mut iterator, false) {
                                 glob = self.do_glob;
-                                looped = true;                                
+                                looped = true;
                             } else {
                                 return Some(self.array(&mut iterator))
                             }
@@ -912,61 +916,67 @@ impl<'a> Iterator for WordIterator<'a> {
                     return Some(WordToken::Whitespace(self.data[start..self.read].into()))
                 },
                 _ => {
-
-
                     let (idx, prev_character, last_character, glob_character_found) = match self.quotes {
                         Quotes::None | Quotes::Single => {
                             match glob {
                                 true  => index_until_unescaped_character(&self.data[self.read..], &[b' ', b'\'', b'"', b'$', b'~', b'{']),
-                                false => index_until_unescaped_character(&self.data[start..],     &[b' ', b'\'', b'"', b'$', b'~', b'{', b'[']),
+                                false => {
+                                    if(looped) {
+                                         index_until_unescaped_character(&self.data[self.read..],  &[b' ', b'\'', b'"', b'$', b'~', b'{', b'['])
+                                    } else {
+                                         index_until_unescaped_character(&self.data[start..],      &[b' ', b'\'', b'"', b'$', b'~', b'{', b'['])
+                                    }
+                                }
                             }
                         },
                         Quotes::Double => {
                             match glob {
-                                true  => index_until_unescaped_character(&self.data[self.read..], &[b' ', b'\'', b'"', b'$', b'~', b'{']),
-                                false => index_until_unescaped_character(&self.data[start..],     &[b' ', b'\'', b'"', b'$', b'~', b'{']),
+                                true  => index_until_unescaped_character(&self.data[self.read..], &[b' ', b'\'', b'"', b'$', b'~']),
+                                false => index_until_unescaped_character(&self.data[start..],     &[b' ', b'\'', b'"', b'$', b'~']),
                             }
                         },
                     };
 
 
-                    
+
 
                     if idx > 0 || looped {
                         self.read += idx;
                         looped = false;
 
-
+                        
                         match last_character {
                             b'[' => {
                                 // Handles corner case of let map:hmap[[int]] = [key1=[1 2 3 4 5] key2=[6 7 8]]
                                 // This section will result in the word token key1=[ being returned
                                 self.read += 1;
-                                
 
-                                if prev_character != b'=' {
-                                    let (idx, _, _, _) = index_until_unescaped_character(&self.data[self.read..], &[b' ']);
-                                    let iterator = iterator.clone().skip(idx).peekable();
-                                    self.read += idx;
+                                
+                                let mut iterator = iterator.clone().skip(idx + 1).peekable();
+                                if prev_character != b'=' && self.glob_check(&mut iterator, true) {
                                     glob = self.do_glob;
                                     looped = true;
+                                    continue
                                 }
                             },
-                            b'?' => {
-                                self.read += 1;
-                                glob = self.do_glob;
-                                let iterator = iterator.clone().skip(idx).peekable();
-                                continue
-                            }
-                            b'*' => {
-                                self.read += 1;
-                                glob = self.do_glob;
-                                let iterator = iterator.clone().skip(idx).peekable();
-                                continue
-                            },
+                            // b'?' => {
+                            //     println!("WTF1");
+                            //     self.read += 1;
+                            //     glob = self.do_glob;
+                            //     let iterator = iterator.clone().skip(idx).peekable();
+                            //     continue
+                            // }
+                            // b'*' => {
+                            //     println!("WTF2");
+                            //     self.read += 1;
+                            //     glob = self.do_glob;
+                            //     let iterator = iterator.clone().skip(idx).peekable();
+                                
+                            //     continue
+                            // },
                             _ => {
                                 if self.do_glob && self.quotes == Quotes::None && glob_character_found {
-                                    glob = glob_character_found;
+                                    glob = self.do_glob;
                                 }
                             },
                         }
