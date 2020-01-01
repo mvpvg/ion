@@ -188,7 +188,6 @@ impl<'a> WordIterator<'a> {
                 b'[' => {
                     square_bracket += 1;
                 }
-                // b' ' | b'"' | b'\'' | b'$' | b'{' | b'}' | b',' => break,
                 b' ' | b'"' | b'\'' | b'$' | b'{' | b'}' => break,
                 b']' => {
                     // If the glob is less than three bytes in width, then it's empty and thus
@@ -748,6 +747,7 @@ impl<'a> Iterator for WordIterator<'a> {
 
 
         
+        
         let mut iterator = self.data.bytes().skip(self.read).peekable();
         let mut start = self.read;
         let mut glob = false;
@@ -952,11 +952,13 @@ impl<'a> Iterator for WordIterator<'a> {
                                 self.read += 1;
 
                                 
-                                let mut iterator = iterator.clone().skip(idx + 1).peekable();
-                                if prev_character != b'=' && self.glob_check(&mut iterator, true) {
-                                    glob = self.do_glob;
-                                    looped = true;
-                                    continue
+                                if prev_character != b'=' {
+                                    let mut iterator = iterator.clone().skip(idx + 1).peekable();
+                                    if self.glob_check(&mut iterator, true) {
+                                        glob = self.do_glob;
+                                        looped = true;
+                                        continue
+                                    }
                                 }
                             },
                             // b'?' => {
