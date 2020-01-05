@@ -980,10 +980,20 @@ impl<'a> Iterator for WordIterator<'a> {
                                                 // Yes, this branch does nothing
                                             }
                                         } else {
-                                            // We've already found a glob character we've also found an invalid glob with square brackets 
-                                            // For example *werty[ abc] or *werty[]
-                                            // Rewind self.read by 1 so we can read up to and include the square bracket [
-                                            self.read -= 1;
+                                            // We've already found a glob character ...
+                                            if iterator.peek() != Some(&b']') {
+                                                // But we've also found an invalid glob with square brackets 
+                                                // For example *werty[ abc]
+                                                // Rewind self.read by 1 so we can read up to and including the square bracket [
+                                                // and treat whatever comes after the [ as part of a new word token
+                                                self.read -= 1;
+                                            } else {
+                                                // But we've also found an empty invalid glob with square brackets
+                                                // For example *werty[]
+                                                // Rewind self.read by 2 so we can read up to but not including the square bracket [
+                                                // and treat whatever comes after the end of our word as part of a new word token
+                                                self.read -= 2;
+                                            }
                                         }
                                     } else {
                                         if self.glob_check(&mut iterator, true) {
