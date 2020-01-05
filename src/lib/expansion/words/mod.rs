@@ -980,18 +980,10 @@ impl<'a> Iterator for WordIterator<'a> {
                                                 // Yes, this branch does nothing
                                             }
                                         } else {
-                                            // We've already found a glob character ...
-                                            if iterator.peek() != Some(&b']') {
-                                                // But we've also found an invalid glob with square brackets 
-                                                // For example *werty[ abc]
-                                                // Rewind self.read by 1 so we can read up to and include the square bracket [
-                                                // and treat whatever comes after the [ as part of a new word token
-                                                self.read -= 1;
-                                            } else {
-                                                // But we've also found an empty glob with square brackets
-                                                // For example *werty[]
-                                                // Yes, this branch does nothing
-                                            }
+                                            // We've already found a glob character we've also found an invalid glob with square brackets 
+                                            // For example *werty[ abc] or *werty[]
+                                            // Rewind self.read by 1 so we can read up to and include the square bracket [
+                                            self.read -= 1;
                                         }
                                     } else {
                                         if self.glob_check(&mut iterator, true) {
