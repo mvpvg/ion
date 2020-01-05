@@ -757,8 +757,7 @@ impl<'a> Iterator for WordIterator<'a> {
 
 
 
-        let mut onetimething = false;
-
+        
         loop {
             let character = iterator.next()?;
             match character {
