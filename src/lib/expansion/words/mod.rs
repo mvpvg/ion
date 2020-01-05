@@ -919,7 +919,7 @@ impl<'a> Iterator for WordIterator<'a> {
                     self.read += idx;
                     return Some(WordToken::Whitespace(self.data[start..self.read].into()))
                 },
-                _ => { // This also matches against None
+                _ => {
                     let (idx, prev_character, last_character, glob_character_found) = match self.quotes {
                         Quotes::None | Quotes::Single => {
                             match glob {
@@ -988,10 +988,17 @@ impl<'a> Iterator for WordIterator<'a> {
                                     } else {
                                         if self.glob_check(&mut iterator, true) {
                                             // We've found a valid glob with square brackets
-                                            // For example qwert[yabc] or qwert[yabc]def
                                             glob = self.do_glob;
-                                            looped = true;
-                                            continue
+                                            if iterator.peek() != None {
+                                                // We haven't reached the end of the iterator yet
+                                                // For example werty[abc]efg
+                                                looped = true;
+                                                continue
+                                            } else {
+                                                // We've reached the end of the iterator
+                                                // For example werty[abc]
+                                                // Yes, this branch does nothing
+                                            }
                                         } else {
                                             // We've found an invalid glob with square brackets
                                             // For example werty[] or werty[ abc]
