@@ -193,7 +193,7 @@ impl<'a> WordIterator<'a> {
                     // If the glob is less than three bytes in width, then it's empty and thus
                     // invalid. If it's not adjacent to text, it's not a glob.
                     let next_char = iter.peek();
-                    if (moves >= 3 && square_bracket == 0)
+                    if (moves >= 2 && square_bracket == 0)
                     && (is_text_adjacent || next_char != None && next_char != Some(&b' '))
                     {
                         glob = true;
@@ -208,7 +208,8 @@ impl<'a> WordIterator<'a> {
             for _ in 0..moves {
                 iterator.next();
             }
-            self.read += moves + 1;
+            // self.read += moves + 1;
+            self.read += moves;
             true
         } else {
             self.read += 1;
@@ -755,6 +756,9 @@ impl<'a> Iterator for WordIterator<'a> {
         let mut looped = false;
 
 
+
+        let mut onetimething = false;
+
         loop {
             let character = iterator.next()?;
             match character {
@@ -896,6 +900,7 @@ impl<'a> Iterator for WordIterator<'a> {
                             if self.glob_check(&mut iterator, false) {
                                 glob = self.do_glob;
                                 looped = true;
+                                continue
                             } else {
                                 return Some(self.array(&mut iterator))
                             }
@@ -915,13 +920,13 @@ impl<'a> Iterator for WordIterator<'a> {
                     self.read += idx;
                     return Some(WordToken::Whitespace(self.data[start..self.read].into()))
                 },
-                _ => {
+                _ => { // This also matches against None
                     let (idx, prev_character, last_character, glob_character_found) = match self.quotes {
                         Quotes::None | Quotes::Single => {
                             match glob {
                                 true  => index_until_unescaped_character(&self.data[self.read..], &[b' ', b'\'', b'"', b'$', b'~', b'{']),
                                 false => {
-                                    if(looped) {
+                                    if looped {
                                          index_until_unescaped_character(&self.data[self.read..],  &[b' ', b'\'', b'"', b'$', b'~', b'{', b'['])
                                     } else {
                                          index_until_unescaped_character(&self.data[start..],      &[b' ', b'\'', b'"', b'$', b'~', b'{', b'['])
@@ -947,37 +952,65 @@ impl<'a> Iterator for WordIterator<'a> {
                         
                         match last_character {
                             b'[' => {
-                                // Handles corner case of let map:hmap[[int]] = [key1=[1 2 3 4 5] key2=[6 7 8]]
-                                // This section will result in the word token key1=[ being returned
+                                // Point self.read to the character after the square bracket [
                                 self.read += 1;
+                                
 
                                 
                                 if prev_character != b'=' {
-                                    let mut iterator = iterator.clone().skip(idx + 1).peekable();
-                                    if self.glob_check(&mut iterator, true) {
-                                        glob = self.do_glob;
-                                        looped = true;
-                                        continue
+                                    for _ in 0..idx {
+                                        // Advance the iterator for side-effects
+                                        iterator.next();
                                     }
+                                    
+
+                                    if self.do_glob && self.quotes != Quotes::Single && glob_character_found {
+                                        glob = self.do_glob;
+                                                 
+
+                                        // Call glob_check for side-effects to iterator and self.read
+                                        if self.glob_check(&mut iterator, true) {
+                                            if iterator.peek() != None {
+                                                // We haven't reached the end of the iterator yet
+                                                // For example *werty[abc]efg
+                                                looped = true;
+                                                continue
+                                            } else {
+                                                // We've reached the end of the iterator
+                                                // For example *werty[abc]
+                                                // Yes, this branch does nothing
+                                            }
+                                        } else {
+                                            // We've already found a glob character ...
+                                            if iterator.peek() != Some(&b']') {
+                                                // But we've also found an invalid glob with square brackets 
+                                                // For example *werty[ abc]
+                                                // Rewind self.read by 1 so we can read up to and include the square bracket [
+                                                // and treat whatever comes after the [ as part of a new word token
+                                                self.read -= 1;
+                                            } else {
+                                                // But we've also found an empty glob with square brackets
+                                                // For example *werty[]
+                                                // Yes, this branch does nothing
+                                            }
+                                        }
+                                    } else {
+                                        if self.glob_check(&mut iterator, true) {
+                                            // We'vefound a valid glob with square brackets
+                                            // For example qwert[yabc] or qwert[yabc]def
+                                            glob = self.do_glob;
+                                            looped = true;
+                                            continue
+                                        }
+                                    }
+                                } else {
+                                    // Handles the corner case of let map:hmap[[int]] = [key1=[1 2 3 4 5] key2=[6 7 8]]
+                                    // This branch will result in the word token key1=[ being returned
+                                    // Yes, this branch does nothing
                                 }
                             },
-                            // b'?' => {
-                            //     println!("WTF1");
-                            //     self.read += 1;
-                            //     glob = self.do_glob;
-                            //     let iterator = iterator.clone().skip(idx).peekable();
-                            //     continue
-                            // }
-                            // b'*' => {
-                            //     println!("WTF2");
-                            //     self.read += 1;
-                            //     glob = self.do_glob;
-                            //     let iterator = iterator.clone().skip(idx).peekable();
-                                
-                            //     continue
-                            // },
                             _ => {
-                                if self.do_glob && self.quotes == Quotes::None && glob_character_found {
+                                if self.do_glob && self.quotes != Quotes::Single && glob_character_found {
                                     glob = self.do_glob;
                                 }
                             },
