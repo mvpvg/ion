@@ -963,7 +963,7 @@ impl<'a> Iterator for WordIterator<'a> {
                                     }
                                     
 
-                                    if self.do_glob && self.quotes != Quotes::Single && glob_character_found {
+                                    if self.do_glob && self.quotes == Quotes::None && glob_character_found {
                                         glob = self.do_glob;
                                                  
 
@@ -1009,7 +1009,7 @@ impl<'a> Iterator for WordIterator<'a> {
                                 }
                             },
                             _ => {
-                                if self.do_glob && self.quotes != Quotes::Single && glob_character_found {
+                                if self.do_glob && self.quotes == Quotes::None && glob_character_found {
                                     glob = self.do_glob;
                                 }
                             },
