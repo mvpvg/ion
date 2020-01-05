@@ -954,7 +954,6 @@ impl<'a> Iterator for WordIterator<'a> {
                                 // Point self.read to the character after the square bracket [
                                 self.read += 1;
                                 
-
                                 
                                 if prev_character != b'=' {
                                     for _ in 0..idx {
@@ -967,7 +966,7 @@ impl<'a> Iterator for WordIterator<'a> {
                                         glob = self.do_glob;
                                                  
 
-                                        // Call glob_check for side-effects to iterator and self.read
+                                        // Even though we've found a glob character we want to call glob_check for side-effects to iterator and self.read
                                         if self.glob_check(&mut iterator, true) {
                                             if iterator.peek() != None {
                                                 // We haven't reached the end of the iterator yet
@@ -980,28 +979,25 @@ impl<'a> Iterator for WordIterator<'a> {
                                                 // Yes, this branch does nothing
                                             }
                                         } else {
-                                            // We've already found a glob character ...
-                                            if iterator.peek() != Some(&b']') {
-                                                // But we've also found an invalid glob with square brackets 
-                                                // For example *werty[ abc]
-                                                // Rewind self.read by 1 so we can read up to and including the square bracket [
-                                                // and treat whatever comes after the [ as part of a new word token
-                                                self.read -= 1;
-                                            } else {
-                                                // But we've also found an empty invalid glob with square brackets
-                                                // For example *werty[]
-                                                // Rewind self.read by 2 so we can read up to but not including the square bracket [
-                                                // and treat whatever comes after the end of our word as part of a new word token
-                                                self.read -= 2;
-                                            }
+                                            // We've already found a glob character but we've also found an invalid glob with square brackets
+                                            // For example *werty[] or *werty[ abc]
+                                            // Rewind self.read by 2 so we can read up to but not including the square bracket [
+                                            // and treat whatever comes after the end of our word as part of a new word token
+                                            self.read -= 2;
                                         }
                                     } else {
                                         if self.glob_check(&mut iterator, true) {
-                                            // We'vefound a valid glob with square brackets
+                                            // We've found a valid glob with square brackets
                                             // For example qwert[yabc] or qwert[yabc]def
                                             glob = self.do_glob;
                                             looped = true;
                                             continue
+                                        } else {
+                                            // We've found an invalid glob with square brackets
+                                            // For example werty[] or werty[ abc]
+                                            // Rewind self.read by 2 so we can read up to but not including the square bracket [
+                                            // and treat whatever comes after the end of our word as part of a new word token
+                                            self.read -= 2;
                                         }
                                     }
                                 } else {
